@@ -6,8 +6,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,32 +32,55 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
+import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
+import com.bumptech.glide.integration.compose.GlideImage
+import com.bumptech.glide.integration.compose.placeholder
 import com.rolandmcdoland.videojournalapp.R
+import com.rolandmcdoland.videojournalapp.data.model.Video
 import com.rolandmcdoland.videojournalapp.ui.theme.VideoJournalAppTheme
+import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun FeedScreen(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: FeedViewModel = koinViewModel()
 ) {
-    // TODO: Add feed items handling
-    FeedScreenStateless(listOf())
+    // TODO: Add getting feed item from database
+    FeedScreenStateless(
+        viewModel.videos,
+        onRequestPlayer = { videoId -> viewModel.requestPlayer(videoId) },
+        modifier = modifier
+    )
 }
 
 @Composable
 fun FeedScreenStateless(
-    feedItems: List<String>,
+    feedItems: List<Video>,
+    onRequestPlayer: (Long) -> Player,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -63,6 +89,8 @@ fun FeedScreenStateless(
         Box(modifier = modifier) {
             Feed(
                 feedItems = feedItems,
+                onRequestPlayer = onRequestPlayer,
+                extraBottomPadding = extraPadding.calculateBottomPadding(),
                 modifier = modifier.padding(top = extraPadding.calculateTopPadding())
             )
             BottomBar(
@@ -107,13 +135,25 @@ fun BottomBar(
 
 @Composable
 fun Feed(
-    feedItems: List<String>,
+    feedItems: List<Video>,
+    onRequestPlayer: (Long) -> Player,
+    extraBottomPadding: Dp,
     modifier: Modifier = Modifier
 ) {
+    var playingVideoId by rememberSaveable { mutableLongStateOf(-1L) }
+
     if(feedItems.isNotEmpty()) {
-        LazyColumn(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            contentPadding = PaddingValues(bottom = 88.dp + extraBottomPadding),
+            modifier = modifier.fillMaxSize()
+        ) {
             items(feedItems) {
-                FeedItem(it)
+                FeedItem(
+                    video = it,
+                    isPlaying = it.id == playingVideoId,
+                    onIsPlayingChanged = { videoId -> playingVideoId = videoId },
+                    onRequestPlayer = onRequestPlayer
+                )
             }
         }
     } else {
@@ -123,7 +163,10 @@ fun Feed(
 
 @Composable
 fun FeedItem(
-    description: String,
+    video: Video,
+    isPlaying: Boolean,
+    onIsPlayingChanged: (Long) -> Unit,
+    onRequestPlayer: (Long) -> Player,
     modifier: Modifier = Modifier
 ) {
     var isExpanded by rememberSaveable { mutableStateOf(false) }
@@ -140,18 +183,101 @@ fun FeedItem(
                     .fillMaxWidth()
                     .animateContentSize()
             ) {
-                // TODO: Add player surface here
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    maxLines = if(isExpanded) Int.MAX_VALUE else 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(8.dp)
+                VideoPlayer(
+                    videoId = video.id,
+                    videoThumbnailUri = video.thumbnailUri,
+                    isPlaying = isPlaying,
+                    onIsPlayingChanged = onIsPlayingChanged,
+                    onRequestPlayer = onRequestPlayer
                 )
+                video.description?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = if (isExpanded) Int.MAX_VALUE else 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
+    }
+}
+
+@androidx.annotation.OptIn(UnstableApi::class)
+@OptIn(ExperimentalGlideComposeApi::class)
+@Composable
+fun VideoPlayer(
+    videoId: Long,
+    videoThumbnailUri: String?,
+    isPlaying: Boolean,
+    onIsPlayingChanged: (Long) -> Unit,
+    onRequestPlayer: (Long) -> Player,
+    modifier: Modifier = Modifier
+) {
+    var lifecycle by remember {
+        mutableStateOf(Lifecycle.Event.ON_CREATE)
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            lifecycle = event
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    Box(
+        modifier = modifier.fillMaxWidth()
+    ) {
+        if (isPlaying) {
+            AndroidView(
+                factory = { context ->
+                    PlayerView(context).also {
+                        it.player = onRequestPlayer(videoId)
+                        it.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
+                    }
+                },
+                update = {
+                    when (lifecycle) {
+                        Lifecycle.Event.ON_PAUSE -> {
+                            it.onPause()
+                            it.player?.pause()
+                        }
+                        Lifecycle.Event.ON_RESUME -> {
+                            it.onResume()
+                        }
+                        else -> Unit
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+            )
+        } else {
+            GlideImage(
+                model = videoThumbnailUri,
+                contentDescription = null,
+                loading = placeholder(R.drawable.video_placeholder),
+                failure = placeholder(R.drawable.video_placeholder),
+                modifier = Modifier.fillMaxWidth()
+            )
+            IconButton(
+                onClick = { onIsPlayingChanged(videoId) },
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    tint = Color.White,
+                    contentDescription = stringResource(R.string.play_video),
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+        }
     }
 }
 
@@ -177,7 +303,12 @@ fun EmptyFeedMessage(
 fun FeedScreenPreview() {
     VideoJournalAppTheme {
         FeedScreenStateless(
-            feedItems = listOf("Description 1", "Description 2", "Description 3")
+            feedItems = listOf(
+                Video(0L, "", "Video 1", ""),
+                Video(1L, "", "Video 2", ""),
+                Video(2L, "", "Video 3", "")
+            ),
+            onRequestPlayer = { TODO("Not required for preview") }
         )
     }
 }
@@ -197,7 +328,13 @@ fun BottomBarPreview() {
 fun FeedPreview() {
     VideoJournalAppTheme {
         Feed(
-            feedItems = listOf("Description 1", "Description 2", "Description 3")
+            feedItems = listOf(
+                Video(0L, "", "Video 1", ""),
+                Video(1L, "", "Video 2", ""),
+                Video(2L, "", "Video 3", "")
+            ),
+            onRequestPlayer = { TODO("Not required for preview") },
+            extraBottomPadding = 0.dp
         )
     }
 }
@@ -207,7 +344,29 @@ fun FeedPreview() {
 fun FeedItemPreview() {
     VideoJournalAppTheme {
         FeedItem(
-            description = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque eu felis sed mi fringilla consectetur dignissim et est. Cras quis faucibus libero. Praesent a ipsum a sem posuere sollicitudin sed vel elit. Praesent non venenatis mauris. Aliquam consequat commodo enim, a rhoncus tortor convallis pharetra. Praesent rhoncus accumsan lacinia. Nunc dictum auctor magna, nec lobortis urna. Duis enim quam, euismod ut velit eu, aliquet lacinia lorem. Vivamus arcu orci, malesuada vitae lorem eget, consectetur porta nisi. Etiam ut est pulvinar, condimentum augue sit amet, finibus magna. Sed tempor sit amet lorem in commodo. Phasellus posuere ipsum neque, sed dignissim enim vestibulum non."
+            video = Video(
+                id = 0L,
+                videoUri = "",
+                description = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque eu felis sed mi fringilla consectetur dignissim et est. Cras quis faucibus libero. Praesent a ipsum a sem posuere sollicitudin sed vel elit. Praesent non venenatis mauris. Aliquam consequat commodo enim, a rhoncus tortor convallis pharetra. Praesent rhoncus accumsan lacinia. Nunc dictum auctor magna, nec lobortis urna. Duis enim quam, euismod ut velit eu, aliquet lacinia lorem. Vivamus arcu orci, malesuada vitae lorem eget, consectetur porta nisi. Etiam ut est pulvinar, condimentum augue sit amet, finibus magna. Sed tempor sit amet lorem in commodo. Phasellus posuere ipsum neque, sed dignissim enim vestibulum non.",
+                thumbnailUri = ""
+            ),
+            isPlaying = false,
+            onIsPlayingChanged = { },
+            onRequestPlayer = { TODO("Not required for preview") }
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun VideoPlayerPreview() {
+    VideoJournalAppTheme {
+        VideoPlayer(
+            videoId = 0L,
+            videoThumbnailUri = "",
+            isPlaying = false,
+            onIsPlayingChanged = { },
+            onRequestPlayer = { TODO("Not required for preview") }
         )
     }
 }
