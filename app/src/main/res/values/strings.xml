@@ -3,4 +3,6 @@
     <string name="add_video">Add video</string>
     <string name="empty_feed">No videos added.</string>
     <string name="play_video">Play video</string>
+    <string name="video_capture_error">Something went wrong! Video couldn\'t be recorded</string>
+    <string name="camera_permission_message">Cannot record video without camera permission</string>
 </resources>

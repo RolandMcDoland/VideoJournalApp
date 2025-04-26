@@ -1,5 +1,12 @@
 package com.rolandmcdoland.videojournalapp.feed
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Environment
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -8,17 +15,12 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -42,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +52,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -63,16 +68,70 @@ import com.rolandmcdoland.videojournalapp.R
 import com.rolandmcdoland.videojournalapp.data.model.Video
 import com.rolandmcdoland.videojournalapp.ui.theme.VideoJournalAppTheme
 import org.koin.androidx.compose.koinViewModel
+import java.io.File
 
 @Composable
 fun FeedScreen(
     modifier: Modifier = Modifier,
     viewModel: FeedViewModel = koinViewModel()
 ) {
+    val context = LocalContext.current
+
+    val captureVideoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CaptureVideo()
+    ) { success ->
+        if (!success) {
+            Toast
+                .makeText(
+                    context,
+                    context.getString(R.string.video_capture_error),
+                    Toast.LENGTH_SHORT
+                )
+                .show()
+        }
+    }
+
+    val requestPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if(isGranted) {
+            captureVideoLauncher.launch(
+                FileProvider.getUriForFile(
+                    context,
+                    context.applicationContext.packageName + ".fileprovider",
+                    context.createTempVideoFile()
+                )
+            )
+        } else {
+            Toast
+                .makeText(
+                    context,
+                    context.getString(R.string.camera_permission_message),
+                    Toast.LENGTH_SHORT
+                )
+                .show()
+        }
+
+    }
+
     // TODO: Add getting feed item from database
     FeedScreenStateless(
         viewModel.videos,
         onRequestPlayer = { videoId -> viewModel.requestPlayer(videoId) },
+        onCaptureVideoClick = {
+            if(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED) {
+                captureVideoLauncher.launch(
+                    FileProvider.getUriForFile(
+                        context,
+                        context.applicationContext.packageName + ".fileprovider",
+                        context.createTempVideoFile()
+                    )
+                )
+            } else {
+                requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        },
         modifier = modifier
     )
 }
@@ -81,6 +140,7 @@ fun FeedScreen(
 fun FeedScreenStateless(
     feedItems: List<Video>,
     onRequestPlayer: (Long) -> Player,
+    onCaptureVideoClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -95,6 +155,7 @@ fun FeedScreenStateless(
             )
             BottomBar(
                 paddingNavBar = extraPadding.calculateBottomPadding(),
+                onCaptureVideoClick = onCaptureVideoClick,
                 modifier = modifier.align(Alignment.BottomStart)
             )
         }
@@ -104,6 +165,7 @@ fun FeedScreenStateless(
 @Composable
 fun BottomBar(
     paddingNavBar: Dp,
+    onCaptureVideoClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(modifier = modifier.requiredHeight(88.dp + paddingNavBar)) {
@@ -121,7 +183,7 @@ fun BottomBar(
                 .align(Alignment.TopCenter)
                 .padding(bottom = 16.dp + paddingNavBar)
         ) {
-            IconButton(onClick = { }, modifier = Modifier.size(72.dp)) {
+            IconButton(onClick = onCaptureVideoClick, modifier = Modifier.size(72.dp)) {
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = stringResource(R.string.add_video),
@@ -308,7 +370,8 @@ fun FeedScreenPreview() {
                 Video(1L, "", "Video 2", ""),
                 Video(2L, "", "Video 3", "")
             ),
-            onRequestPlayer = { TODO("Not required for preview") }
+            onRequestPlayer = { TODO("Not required for preview") },
+            onCaptureVideoClick = { }
         )
     }
 }
@@ -318,7 +381,8 @@ fun FeedScreenPreview() {
 fun BottomBarPreview() {
     VideoJournalAppTheme {
         BottomBar(
-            paddingNavBar = 0.dp
+            paddingNavBar = 0.dp,
+            onCaptureVideoClick = { }
         )
     }
 }
@@ -377,4 +441,9 @@ fun EmptyFeedMessagePreview() {
     VideoJournalAppTheme {
         EmptyFeedMessage()
     }
+}
+
+fun Context.createTempVideoFile(): File {
+    val directory = this.getExternalFilesDir(Environment.DIRECTORY_DCIM)
+    return File.createTempFile("temp", ".mp4", directory)
 }
