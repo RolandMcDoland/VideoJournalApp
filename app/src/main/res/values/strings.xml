@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">VideoJournalApp</string>
+    <string name="add_video">Add video</string>
+    <string name="empty_feed">No videos added.</string>
 </resources>
