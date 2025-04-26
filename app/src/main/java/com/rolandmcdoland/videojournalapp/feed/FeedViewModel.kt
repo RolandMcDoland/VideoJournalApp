@@ -8,7 +8,7 @@ import com.rolandmcdoland.videojournalapp.data.model.Video
 import kotlinx.coroutines.launch
 
 class FeedViewModel(private val player: Player): ViewModel() {
-    var videos = listOf<Video>(
+    var videos = listOf(
         Video(0L, "https://storage.googleapis.com/exoplayer-test-media-0/shortform_2.mp4", "Video 1", "https://cross-play.pl/wp-content/uploads/2024/02/Cyberpunk-2077-Ultimate-Edition-wallpaper.jpg"),
         Video(1L, "https://storage.googleapis.com/exoplayer-test-media-0/shortform_3.mp4", "Video 2", "https://cross-play.pl/wp-content/uploads/2024/02/Cyberpunk-2077-Ultimate-Edition-wallpaper.jpg"),
         Video(2L, "https://html5demos.com/assets/dizzy.mp4", "Video 3", "https://cross-play.pl/wp-content/uploads/2024/02/Cyberpunk-2077-Ultimate-Edition-wallpaper.jpg")
