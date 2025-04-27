@@ -1,6 +1,8 @@
 package com.rolandmcdoland.videojournalapp
 
+import android.content.Context
 import android.net.Uri
+import android.os.Environment
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -14,8 +16,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.rolandmcdoland.videojournalapp.feed.FeedScreen
-import com.rolandmcdoland.videojournalapp.feed.createTempVideoFile
 import com.rolandmcdoland.videojournalapp.form.FormScreen
+import java.io.File
 
 @Composable
 fun MainScreen(modifier: Modifier = Modifier) {
@@ -61,4 +63,9 @@ fun MainScreen(modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+fun Context.createTempVideoFile(): File {
+    val directory = this.getExternalFilesDir(Environment.DIRECTORY_DCIM)
+    return File.createTempFile("video_journal_", ".mp4", directory)
 }

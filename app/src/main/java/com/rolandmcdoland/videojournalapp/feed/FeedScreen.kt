@@ -451,8 +451,3 @@ fun EmptyFeedMessagePreview() {
         EmptyFeedMessage()
     }
 }
-
-fun Context.createTempVideoFile(): File {
-    val directory = this.getExternalFilesDir(Environment.DIRECTORY_DCIM)
-    return File.createTempFile("temp", ".mp4", directory)
-}

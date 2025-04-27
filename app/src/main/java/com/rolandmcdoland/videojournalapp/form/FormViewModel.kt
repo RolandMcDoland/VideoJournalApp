@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rolandmcdoland.videojournalapp.data.repository.VideoRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class FormViewModel(
@@ -14,26 +15,24 @@ class FormViewModel(
     var insertState by mutableStateOf<InsertSate?>(null)
         private set
 
-    fun insertVideo(
+    suspend fun insertVideo(
         videoUri: String,
-        description: String?,
+        description: String,
         thumbnailUri: String?
     ) {
-        viewModelScope.launch {
-            try {
-                insertState = InsertSate.Loading
+        try {
+            insertState = InsertSate.Loading
 
-                videoRepository.insertVideo(
-                    System.currentTimeMillis(),
-                    videoUri,
-                    description,
-                    thumbnailUri
-                )
+            videoRepository.insertVideo(
+                System.currentTimeMillis(),
+                videoUri,
+                description.ifBlank { null },
+                thumbnailUri
+            )
 
-                insertState = InsertSate.Success
-            } catch(e: Exception) {
-                insertState = InsertSate.Error
-            }
+            insertState = InsertSate.Success
+        } catch(e: Exception) {
+            insertState = InsertSate.Error
         }
     }
 }

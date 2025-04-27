@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,6 +38,7 @@ import com.bumptech.glide.integration.compose.GlideImage
 import com.rolandmcdoland.videojournalapp.R
 import com.rolandmcdoland.videojournalapp.ui.LoadingScreen
 import com.rolandmcdoland.videojournalapp.ui.theme.VideoJournalAppTheme
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -59,6 +61,8 @@ fun FormScreen(
             thumbnailUri = uri
         }
     }
+
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(viewModel.insertState) {
         when(viewModel.insertState) {
@@ -95,11 +99,13 @@ fun FormScreen(
             },
             thumbnailUri = thumbnailUri,
             onSaveClick = {
-                viewModel.insertVideo(
-                    videoUri.toString(),
-                    description.ifBlank { null },
-                    thumbnailUri?.toString()
-                )
+                scope.launch {
+                    viewModel.insertVideo(
+                        videoUri.toString(),
+                        description,
+                        thumbnailUri?.toString()
+                    )
+                }
             },
             modifier = modifier
         )
