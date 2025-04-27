@@ -6,6 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.rolandmcdoland.videojournalapp.feed.FeedScreen
+import com.rolandmcdoland.videojournalapp.form.FormScreen
 
 @Composable
 fun MainScreen(modifier: Modifier = Modifier) {
@@ -17,7 +18,12 @@ fun MainScreen(modifier: Modifier = Modifier) {
         modifier = modifier
     ) {
         composable<Feed> {
-            FeedScreen()
+            FeedScreen(
+                onVideoRecorded = { navController.navigate(Form) }
+            )
+        }
+        composable<Form> {
+            FormScreen()
         }
     }
 }

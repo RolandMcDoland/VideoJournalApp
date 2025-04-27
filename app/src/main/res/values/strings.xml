@@ -5,4 +5,8 @@
     <string name="play_video">Play video</string>
     <string name="video_capture_error">Something went wrong! Video couldn\'t be recorded</string>
     <string name="camera_permission_message">Cannot record video without camera permission</string>
+    <string name="choose_picture">Choose picture</string>
+    <string name="thumbnail_headline">Choose a thumbnail for your video (optional)</string>
+    <string name="description_headline">Add a description to your video (optional)</string>
+    <string name="save">Save</string>
 </resources>

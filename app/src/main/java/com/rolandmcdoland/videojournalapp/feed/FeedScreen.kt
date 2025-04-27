@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -72,6 +73,7 @@ import java.io.File
 
 @Composable
 fun FeedScreen(
+    onVideoRecorded: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: FeedViewModel = koinViewModel()
 ) {
@@ -80,7 +82,9 @@ fun FeedScreen(
     val captureVideoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CaptureVideo()
     ) { success ->
-        if (!success) {
+        if (success) {
+            onVideoRecorded()
+        } else {
             Toast
                 .makeText(
                     context,
@@ -318,6 +322,7 @@ fun VideoPlayer(
                     }
                 },
                 modifier = Modifier
+                    .defaultMinSize(minHeight = 256.dp)
                     .fillMaxWidth()
             )
         } else {
