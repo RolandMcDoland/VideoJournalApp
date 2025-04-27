@@ -1,6 +1,7 @@
 package com.rolandmcdoland.videojournalapp.form
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,12 +20,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -32,10 +35,19 @@ import androidx.compose.ui.unit.dp
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.rolandmcdoland.videojournalapp.R
+import com.rolandmcdoland.videojournalapp.ui.LoadingScreen
 import com.rolandmcdoland.videojournalapp.ui.theme.VideoJournalAppTheme
+import org.koin.androidx.compose.koinViewModel
 
 @Composable
-fun FormScreen(modifier: Modifier = Modifier) {
+fun FormScreen(
+    videoUri: Uri,
+    onVideoSaved: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: FormViewModel = koinViewModel()
+) {
+    val context = LocalContext.current
+
     var description by rememberSaveable { mutableStateOf("") }
 
     var thumbnailUri by rememberSaveable { mutableStateOf<Uri?>(null) }
@@ -48,21 +60,50 @@ fun FormScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    FormScreenStateless(
-        description = description,
-        onDescriptionChange = { desc ->
-            description = desc
-        },
-        onPickImageClick = {
-            pickImageLauncher.launch(
-                PickVisualMediaRequest(
-                    ActivityResultContracts.PickVisualMedia.ImageOnly
+    LaunchedEffect(viewModel.insertState) {
+        when(viewModel.insertState) {
+            is InsertSate.Success -> {
+                onVideoSaved()
+            }
+            is InsertSate.Error -> {
+                Toast
+                    .makeText(
+                        context,
+                        context.getString(R.string.general_error),
+                        Toast.LENGTH_SHORT
+                    )
+                    .show()
+            }
+            else -> { /* do nothing */ }
+        }
+    }
+
+    if(viewModel.insertState is InsertSate.Loading) {
+        LoadingScreen()
+    } else {
+        FormScreenStateless(
+            description = description,
+            onDescriptionChange = { desc ->
+                description = desc
+            },
+            onPickImageClick = {
+                pickImageLauncher.launch(
+                    PickVisualMediaRequest(
+                        ActivityResultContracts.PickVisualMedia.ImageOnly
+                    )
                 )
-            )
-        },
-        thumbnailUri = thumbnailUri,
-        modifier = modifier
-    )
+            },
+            thumbnailUri = thumbnailUri,
+            onSaveClick = {
+                viewModel.insertVideo(
+                    videoUri.toString(),
+                    description.ifBlank { null },
+                    thumbnailUri?.toString()
+                )
+            },
+            modifier = modifier
+        )
+    }
 }
 
 @Composable
@@ -71,11 +112,15 @@ fun FormScreenStateless(
     onDescriptionChange: (String) -> Unit,
     onPickImageClick: () -> Unit,
     thumbnailUri: Uri?,
+    onSaveClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold { extraPadding ->
         Column(modifier = Modifier.fillMaxHeight()) {
-            Column(modifier = modifier.weight(1f).padding(top = extraPadding.calculateTopPadding()).verticalScroll(rememberScrollState())) {
+            Column(modifier = modifier
+                .weight(1f)
+                .padding(top = extraPadding.calculateTopPadding())
+                .verticalScroll(rememberScrollState())) {
                 DescriptionSection(
                     description = description,
                     onDescriptionChange = onDescriptionChange
@@ -86,7 +131,7 @@ fun FormScreenStateless(
                 )
             }
             Button(
-                onClick = { },
+                onClick = onSaveClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(
@@ -110,7 +155,9 @@ fun DescriptionSection(
     onDescriptionChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.padding(horizontal = 16.dp, vertical = 36.dp).fillMaxWidth()) {
+    Column(modifier = modifier
+        .padding(horizontal = 16.dp, vertical = 36.dp)
+        .fillMaxWidth()) {
         Text(
             text = stringResource(R.string.description_headline),
             style = MaterialTheme.typography.titleMedium,
@@ -132,7 +179,9 @@ fun ThumbnailSection(
     onPickImageClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+    Column(modifier = modifier
+        .padding(horizontal = 16.dp)
+        .fillMaxWidth()) {
         Text(
             text = stringResource(R.string.thumbnail_headline),
             style = MaterialTheme.typography.titleMedium,
@@ -175,7 +224,8 @@ fun FormScreenPreview() {
             description = "",
             onDescriptionChange = { },
             onPickImageClick = { },
-            thumbnailUri = null
+            thumbnailUri = null,
+            onSaveClick = { }
         )
     }
 }

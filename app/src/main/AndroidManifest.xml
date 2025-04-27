@@ -4,8 +4,6 @@
 
     <uses-feature android:name="android.hardware.camera" android:required="true" />
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- TODO Remove after adding recording feature -->
-    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".VideoJournalApplication"

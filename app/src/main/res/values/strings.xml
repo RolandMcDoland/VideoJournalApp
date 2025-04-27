@@ -9,4 +9,5 @@
     <string name="thumbnail_headline">Choose a thumbnail for your video (optional)</string>
     <string name="description_headline">Add a description to your video (optional)</string>
     <string name="save">Save</string>
+    <string name="general_error">Something went wrong</string>
 </resources>

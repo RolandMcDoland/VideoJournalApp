@@ -3,6 +3,7 @@ package com.rolandmcdoland.videojournalapp.feed
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Environment
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -36,6 +37,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -66,14 +68,15 @@ import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.bumptech.glide.integration.compose.placeholder
 import com.rolandmcdoland.videojournalapp.R
-import com.rolandmcdoland.videojournalapp.data.model.Video
 import com.rolandmcdoland.videojournalapp.ui.theme.VideoJournalAppTheme
 import org.koin.androidx.compose.koinViewModel
+import videojournal.videodb.VideoEntity
 import java.io.File
 
 @Composable
 fun FeedScreen(
     onVideoRecorded: () -> Unit,
+    onRequestFileUri: () -> Uri?,
     modifier: Modifier = Modifier,
     viewModel: FeedViewModel = koinViewModel()
 ) {
@@ -99,13 +102,11 @@ fun FeedScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if(isGranted) {
-            captureVideoLauncher.launch(
-                FileProvider.getUriForFile(
-                    context,
-                    context.applicationContext.packageName + ".fileprovider",
-                    context.createTempVideoFile()
+            onRequestFileUri()?.let {
+                captureVideoLauncher.launch(
+                    it
                 )
-            )
+            }
         } else {
             Toast
                 .makeText(
@@ -118,20 +119,19 @@ fun FeedScreen(
 
     }
 
-    // TODO: Add getting feed item from database
+    val videos by viewModel.videos.collectAsState(emptyList())
+
     FeedScreenStateless(
-        viewModel.videos,
-        onRequestPlayer = { videoId -> viewModel.requestPlayer(videoId) },
+        videos,
+        onRequestPlayer = { videoUri -> viewModel.requestPlayer(videoUri) },
         onCaptureVideoClick = {
             if(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
                 == PackageManager.PERMISSION_GRANTED) {
-                captureVideoLauncher.launch(
-                    FileProvider.getUriForFile(
-                        context,
-                        context.applicationContext.packageName + ".fileprovider",
-                        context.createTempVideoFile()
+                onRequestFileUri()?.let {
+                    captureVideoLauncher.launch(
+                        it
                     )
-                )
+                }
             } else {
                 requestPermissionLauncher.launch(Manifest.permission.CAMERA)
             }
@@ -142,8 +142,8 @@ fun FeedScreen(
 
 @Composable
 fun FeedScreenStateless(
-    feedItems: List<Video>,
-    onRequestPlayer: (Long) -> Player,
+    feedItems: List<VideoEntity>,
+    onRequestPlayer: (String) -> Player,
     onCaptureVideoClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -201,8 +201,8 @@ fun BottomBar(
 
 @Composable
 fun Feed(
-    feedItems: List<Video>,
-    onRequestPlayer: (Long) -> Player,
+    feedItems: List<VideoEntity>,
+    onRequestPlayer: (String) -> Player,
     extraBottomPadding: Dp,
     modifier: Modifier = Modifier
 ) {
@@ -229,10 +229,10 @@ fun Feed(
 
 @Composable
 fun FeedItem(
-    video: Video,
+    video: VideoEntity,
     isPlaying: Boolean,
     onIsPlayingChanged: (Long) -> Unit,
-    onRequestPlayer: (Long) -> Player,
+    onRequestPlayer: (String) -> Player,
     modifier: Modifier = Modifier
 ) {
     var isExpanded by rememberSaveable { mutableStateOf(false) }
@@ -250,8 +250,7 @@ fun FeedItem(
                     .animateContentSize()
             ) {
                 VideoPlayer(
-                    videoId = video.id,
-                    videoThumbnailUri = video.thumbnailUri,
+                    video = video,
                     isPlaying = isPlaying,
                     onIsPlayingChanged = onIsPlayingChanged,
                     onRequestPlayer = onRequestPlayer
@@ -276,11 +275,10 @@ fun FeedItem(
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun VideoPlayer(
-    videoId: Long,
-    videoThumbnailUri: String?,
+    video: VideoEntity,
     isPlaying: Boolean,
     onIsPlayingChanged: (Long) -> Unit,
-    onRequestPlayer: (Long) -> Player,
+    onRequestPlayer: (String) -> Player,
     modifier: Modifier = Modifier
 ) {
     var lifecycle by remember {
@@ -305,7 +303,7 @@ fun VideoPlayer(
             AndroidView(
                 factory = { context ->
                     PlayerView(context).also {
-                        it.player = onRequestPlayer(videoId)
+                        it.player = onRequestPlayer(video.videoUri)
                         it.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
                     }
                 },
@@ -327,14 +325,14 @@ fun VideoPlayer(
             )
         } else {
             GlideImage(
-                model = videoThumbnailUri,
+                model = video.thumbnailUri,
                 contentDescription = null,
                 loading = placeholder(R.drawable.video_placeholder),
                 failure = placeholder(R.drawable.video_placeholder),
                 modifier = Modifier.fillMaxWidth()
             )
             IconButton(
-                onClick = { onIsPlayingChanged(videoId) },
+                onClick = { onIsPlayingChanged(video.id) },
                 modifier = Modifier.align(Alignment.Center)
             ) {
                 Icon(
@@ -371,9 +369,9 @@ fun FeedScreenPreview() {
     VideoJournalAppTheme {
         FeedScreenStateless(
             feedItems = listOf(
-                Video(0L, "", "Video 1", ""),
-                Video(1L, "", "Video 2", ""),
-                Video(2L, "", "Video 3", "")
+                VideoEntity(0L, 0L, "", "Video 1", ""),
+                VideoEntity(1L, 0L, "", "Video 2", ""),
+                VideoEntity(2L, 0L, "", "Video 3", "")
             ),
             onRequestPlayer = { TODO("Not required for preview") },
             onCaptureVideoClick = { }
@@ -398,9 +396,9 @@ fun FeedPreview() {
     VideoJournalAppTheme {
         Feed(
             feedItems = listOf(
-                Video(0L, "", "Video 1", ""),
-                Video(1L, "", "Video 2", ""),
-                Video(2L, "", "Video 3", "")
+                VideoEntity(0L, 0L, "", "Video 1", ""),
+                VideoEntity(1L, 0L, "", "Video 2", ""),
+                VideoEntity(2L, 0L, "", "Video 3", "")
             ),
             onRequestPlayer = { TODO("Not required for preview") },
             extraBottomPadding = 0.dp
@@ -413,8 +411,9 @@ fun FeedPreview() {
 fun FeedItemPreview() {
     VideoJournalAppTheme {
         FeedItem(
-            video = Video(
+            video = VideoEntity(
                 id = 0L,
+                timestamp = 0L,
                 videoUri = "",
                 description = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque eu felis sed mi fringilla consectetur dignissim et est. Cras quis faucibus libero. Praesent a ipsum a sem posuere sollicitudin sed vel elit. Praesent non venenatis mauris. Aliquam consequat commodo enim, a rhoncus tortor convallis pharetra. Praesent rhoncus accumsan lacinia. Nunc dictum auctor magna, nec lobortis urna. Duis enim quam, euismod ut velit eu, aliquet lacinia lorem. Vivamus arcu orci, malesuada vitae lorem eget, consectetur porta nisi. Etiam ut est pulvinar, condimentum augue sit amet, finibus magna. Sed tempor sit amet lorem in commodo. Phasellus posuere ipsum neque, sed dignissim enim vestibulum non.",
                 thumbnailUri = ""
@@ -431,8 +430,13 @@ fun FeedItemPreview() {
 fun VideoPlayerPreview() {
     VideoJournalAppTheme {
         VideoPlayer(
-            videoId = 0L,
-            videoThumbnailUri = "",
+            video = VideoEntity(
+                id = 0L,
+                timestamp = 0L,
+                videoUri = "",
+                description = "",
+                thumbnailUri = ""
+            ),
             isPlaying = false,
             onIsPlayingChanged = { },
             onRequestPlayer = { TODO("Not required for preview") }
