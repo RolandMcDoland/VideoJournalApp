@@ -177,7 +177,7 @@ fun BottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height((maxHeight / 2) + (8.dp + (paddingNavBar / 2)))
-                .background(MaterialTheme.colorScheme.onSurface)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
                 .align(Alignment.BottomStart)
         )
         Surface(
