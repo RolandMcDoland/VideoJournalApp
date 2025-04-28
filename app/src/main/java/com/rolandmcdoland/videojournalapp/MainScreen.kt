@@ -20,7 +20,10 @@ import com.rolandmcdoland.videojournalapp.form.FormScreen
 import java.io.File
 
 @Composable
-fun MainScreen(modifier: Modifier = Modifier) {
+fun MainScreen(
+    onShareClick: (Uri) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val navController = rememberNavController()
 
     var fileUri by rememberSaveable { mutableStateOf<Uri?>(null) }
@@ -42,7 +45,8 @@ fun MainScreen(modifier: Modifier = Modifier) {
                         context.createTempVideoFile()
                     )
                     fileUri
-                }
+                },
+                onShareClick = onShareClick
             )
         }
         composable<Form> {

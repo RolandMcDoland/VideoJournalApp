@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -72,11 +73,13 @@ import com.rolandmcdoland.videojournalapp.ui.theme.VideoJournalAppTheme
 import org.koin.androidx.compose.koinViewModel
 import videojournal.videodb.VideoEntity
 import java.io.File
+import androidx.core.net.toUri
 
 @Composable
 fun FeedScreen(
     onVideoRecorded: () -> Unit,
     onRequestFileUri: () -> Uri?,
+    onShareClick: (Uri) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: FeedViewModel = koinViewModel()
 ) {
@@ -136,6 +139,7 @@ fun FeedScreen(
                 requestPermissionLauncher.launch(Manifest.permission.CAMERA)
             }
         },
+        onShareClick = onShareClick,
         modifier = modifier
     )
 }
@@ -145,6 +149,7 @@ fun FeedScreenStateless(
     feedItems: List<VideoEntity>,
     onRequestPlayer: (String) -> Player,
     onCaptureVideoClick: () -> Unit,
+    onShareClick: (Uri) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -155,6 +160,7 @@ fun FeedScreenStateless(
                 feedItems = feedItems,
                 onRequestPlayer = onRequestPlayer,
                 extraBottomPadding = extraPadding.calculateBottomPadding(),
+                onShareClick = onShareClick,
                 modifier = modifier.padding(top = extraPadding.calculateTopPadding())
             )
             BottomBar(
@@ -204,6 +210,7 @@ fun Feed(
     feedItems: List<VideoEntity>,
     onRequestPlayer: (String) -> Player,
     extraBottomPadding: Dp,
+    onShareClick: (Uri) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var playingVideoId by rememberSaveable { mutableLongStateOf(-1L) }
@@ -218,7 +225,8 @@ fun Feed(
                     video = it,
                     isPlaying = it.id == playingVideoId,
                     onIsPlayingChanged = { videoId -> playingVideoId = videoId },
-                    onRequestPlayer = onRequestPlayer
+                    onRequestPlayer = onRequestPlayer,
+                    onShareClick = onShareClick
                 )
             }
         }
@@ -233,6 +241,7 @@ fun FeedItem(
     isPlaying: Boolean,
     onIsPlayingChanged: (Long) -> Unit,
     onRequestPlayer: (String) -> Player,
+    onShareClick: (Uri) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isExpanded by rememberSaveable { mutableStateOf(false) }
@@ -258,12 +267,27 @@ fun FeedItem(
                 video.description?.let {
                     Text(
                         text = it,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         maxLines = if (isExpanded) Int.MAX_VALUE else 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(8.dp)
                     )
+                }
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    IconButton(
+                        onClick = { onShareClick(video.videoUri.toUri()) },
+                        modifier = Modifier
+                            .padding(end = 8.dp, bottom = 8.dp)
+                            .align(Alignment.TopEnd)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            contentDescription = stringResource(R.string.play_video),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
         }
@@ -374,7 +398,8 @@ fun FeedScreenPreview() {
                 VideoEntity(2L, 0L, "", "Video 3", "")
             ),
             onRequestPlayer = { TODO("Not required for preview") },
-            onCaptureVideoClick = { }
+            onCaptureVideoClick = { },
+            onShareClick = {  }
         )
     }
 }
@@ -401,7 +426,8 @@ fun FeedPreview() {
                 VideoEntity(2L, 0L, "", "Video 3", "")
             ),
             onRequestPlayer = { TODO("Not required for preview") },
-            extraBottomPadding = 0.dp
+            extraBottomPadding = 0.dp,
+            onShareClick = {  }
         )
     }
 }
@@ -420,7 +446,8 @@ fun FeedItemPreview() {
             ),
             isPlaying = false,
             onIsPlayingChanged = { },
-            onRequestPlayer = { TODO("Not required for preview") }
+            onRequestPlayer = { TODO("Not required for preview") },
+            onShareClick = {  }
         )
     }
 }
