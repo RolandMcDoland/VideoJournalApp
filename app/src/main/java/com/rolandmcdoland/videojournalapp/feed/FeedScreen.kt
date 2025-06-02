@@ -16,10 +16,12 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
@@ -30,12 +32,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -81,6 +85,7 @@ fun FeedScreen(
     onVideoRecorded: () -> Unit,
     onRequestFileUri: () -> Uri?,
     onShareClick: (Uri) -> Unit,
+    onGoToSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: FeedViewModel = koinViewModel()
 ) {
@@ -102,6 +107,7 @@ fun FeedScreen(
         }
     }
 
+    var permissionAlertVisible by remember { mutableStateOf(false) }
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -112,13 +118,7 @@ fun FeedScreen(
                 )
             }
         } else {
-            Toast
-                .makeText(
-                    context,
-                    context.getString(R.string.camera_permission_message),
-                    Toast.LENGTH_SHORT
-                )
-                .show()
+            permissionAlertVisible = true
         }
 
     }
@@ -141,6 +141,9 @@ fun FeedScreen(
             }
         },
         onShareClick = onShareClick,
+        permissionAlertVisible = permissionAlertVisible,
+        onDismissPermissionDialog = { permissionAlertVisible = false },
+        onGoToSettings = onGoToSettings,
         modifier = modifier
     )
 }
@@ -151,6 +154,9 @@ fun FeedScreenStateless(
     onRequestPlayer: (String) -> Player,
     onCaptureVideoClick: () -> Unit,
     onShareClick: (Uri) -> Unit,
+    permissionAlertVisible: Boolean,
+    onDismissPermissionDialog: () -> Unit,
+    onGoToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -169,6 +175,31 @@ fun FeedScreenStateless(
                 onCaptureVideoClick = onCaptureVideoClick,
                 modifier = modifier.align(Alignment.BottomStart)
             )
+            if(permissionAlertVisible) {
+                AlertDialog(
+                    text = {
+                        Text(text = stringResource(R.string.camera_permission_message))
+                    },
+                    onDismissRequest = onDismissPermissionDialog,
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                onDismissPermissionDialog()
+                                onGoToSettings()
+                            }
+                        ) {
+                            Text(stringResource(R.string.go_to_settings))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = onDismissPermissionDialog
+                        ) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -329,7 +360,7 @@ fun VideoPlayer(
                 factory = { context ->
                     PlayerView(context).also {
                         it.player = onRequestPlayer(video.videoUri)
-                        it.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
+                        it.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     }
                 },
                 update = {
@@ -345,7 +376,7 @@ fun VideoPlayer(
                     }
                 },
                 modifier = Modifier
-                    .defaultMinSize(minHeight = 256.dp)
+                    .heightIn(min = 256.dp, max = 512.dp)
                     .fillMaxWidth()
             )
         } else {
@@ -355,7 +386,9 @@ fun VideoPlayer(
                 contentScale = ContentScale.Crop,
                 loading = placeholder(R.drawable.video_placeholder),
                 failure = placeholder(R.drawable.video_placeholder),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .heightIn(min = 256.dp, max = 512.dp)
+                    .fillMaxWidth()
             )
             IconButton(
                 onClick = { onIsPlayingChanged(video.id) },
@@ -401,7 +434,10 @@ fun FeedScreenPreview() {
             ),
             onRequestPlayer = { TODO("Not required for preview") },
             onCaptureVideoClick = { },
-            onShareClick = {  }
+            onShareClick = {  },
+            permissionAlertVisible = false,
+            onDismissPermissionDialog = { },
+            onGoToSettings = { }
         )
     }
 }

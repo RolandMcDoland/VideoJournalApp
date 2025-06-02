@@ -22,6 +22,7 @@ import java.io.File
 @Composable
 fun MainScreen(
     onShareClick: (Uri) -> Unit,
+    onGoToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val navController = rememberNavController()
@@ -46,7 +47,8 @@ fun MainScreen(
                     )
                     fileUri
                 },
-                onShareClick = onShareClick
+                onShareClick = onShareClick,
+                onGoToSettings = onGoToSettings
             )
         }
         composable<Form> {

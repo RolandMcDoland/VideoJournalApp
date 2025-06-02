@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import com.rolandmcdoland.videojournalapp.data.repository.VideoRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -14,6 +16,7 @@ class FeedViewModel(
 ): ViewModel() {
     val videos = videoRepository
         .fetchAllVideos()
+        .flowOn(Dispatchers.IO)
         .map {
             it.sortedByDescending {
                 video -> video.timestamp
